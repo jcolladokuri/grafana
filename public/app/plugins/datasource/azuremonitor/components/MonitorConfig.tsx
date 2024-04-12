@@ -8,6 +8,7 @@ import { AzureDataSourceSettings, AzureCredentials } from '../types';
 
 import { AzureCredentialsForm } from './AzureCredentialsForm';
 import { DefaultSubscription } from './DefaultSubscription';
+import { BasicLogsToggle } from './ BasicLogsToggle';
 
 const azureClouds: SelectableValue[] = [
   { value: 'azuremonitor', label: 'Azure' },
@@ -40,6 +41,10 @@ export const MonitorConfig = (props: Props) => {
 
   const onSubscriptionChange = (subscriptionId?: string) =>
     updateOptions((options) => ({ ...options, jsonData: { ...options.jsonData, subscriptionId } }));
+  
+    
+  const onBasicLogsToggleChange = (basicLogsEnabled: boolean) => 
+  updateOptions((options) => ({ ...options, jsonData: { ...options.jsonData, basicLogsEnabled }}))
 
   return (
     <>
@@ -61,6 +66,9 @@ export const MonitorConfig = (props: Props) => {
           options={options.jsonData}
         />
       </AzureCredentialsForm>
+      <BasicLogsToggle
+        onBasicLogsToggleChange={onBasicLogsToggleChange}
+      />
     </>
   );
 };

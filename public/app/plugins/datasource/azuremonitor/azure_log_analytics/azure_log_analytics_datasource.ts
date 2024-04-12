@@ -52,6 +52,9 @@ export default class AzureLogAnalyticsDatasource extends DataSourceWithBackend<
   }
 
   filterQuery(item: AzureMonitorQuery): boolean {
+    if (item.azureLogAnalytics.basicLogsQuery && !item.azureLogAnalytics.basicLogsQueryCostAcknowledged) {
+      return false;
+    }
     return (
       item.hide !== true &&
       ((!!item.azureLogAnalytics?.query &&
@@ -93,10 +96,17 @@ export default class AzureLogAnalyticsDatasource extends DataSourceWithBackend<
     return this.getResource<AzureAPIResponse<Workspace>>(workspaceListUrl);
   }
 
+  async getTableMetadata(resourceURI: string, tableName: string) {
+    const path = `/resourcegraph/${resourceURI}/tables/${tableName}?api-version=2022-10-01`
+    const resp = await this.getResource(path);
+
+    return resp;
+  }
   async getMetadata(resourceUri: string) {
     const path = `${this.resourcePath}/v1${resourceUri}/metadata`;
 
     const resp = await this.getResource(path);
+    // const resp2 = await this.getResource("loganalytics/v1/workspaces/81a662b5-8541-481b-977d-5d956616ac5e/metadata");
     return resp;
   }
 
@@ -130,6 +140,8 @@ export default class AzureLogAnalyticsDatasource extends DataSourceWithBackend<
           // Workspace was removed in Grafana 8, but remains for backwards compat
           workspace,
           dashboardTime: item.dashboardTime,
+          basicLogsQuery: item.basicLogsQuery,
+          basicLogsQueryCostAcknowledged: item.basicLogsQueryCostAcknowledged,
           timeColumn: this.templateSrv.replace(item.timeColumn, scopedVars),
         },
       };

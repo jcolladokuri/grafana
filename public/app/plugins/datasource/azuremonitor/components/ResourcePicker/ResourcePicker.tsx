@@ -51,6 +51,7 @@ const ResourcePicker = ({
   const [shouldShowLimitFlag, setShouldShowLimitFlag] = useState(false);
   const selectionNoticeText = selectionNotice?.(selectedRows);
 
+  console.log(internalSelected)
   // Sync the resourceURI prop to internal state
   useEffect(() => {
     setInternalSelected(resources);

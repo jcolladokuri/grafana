@@ -117,6 +117,9 @@ composableKinds: DataQuery: {
 					timeColumn?: string
 					// Workspace ID. This was removed in Grafana 8, but remains for backwards compat.
 					workspace?: string
+					// Whether basic logs query is being run
+					basicLogsQuery?: bool
+					basicLogsQueryCostAcknowledged?: bool
 
 					// @deprecated Use resources instead 
 					resource?: string

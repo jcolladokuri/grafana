@@ -7,12 +7,22 @@ import { AzureQueryEditorFieldProps } from '../../types';
 
 import { setDashboardTime, setTimeColumn } from './setQueryValue';
 
-export function TimeManagement({ query, onQueryChange: onChange, schema }: AzureQueryEditorFieldProps) {
+export function TimeManagement({ query, datasource, onQueryChange: onChange, schema }: AzureQueryEditorFieldProps) {
   const [defaultTimeColumns, setDefaultTimeColumns] = useState<SelectableValue[] | undefined>();
   const [timeColumns, setTimeColumns] = useState<SelectableValue[] | undefined>();
+  // const [disableTimePicker, setDisableTimePicker] = useState<boolean>(query.azureLogAnalytics.basicLogsQuery);
+  const [disabledTimeOptions, setDisabledTimeOptions] = useState<boolean[]>([]);
 
   const setDefaultColumn = useCallback((column: string) => onChange(setTimeColumn(query, column)), [query, onChange]);
 
+  useEffect(() => {
+    if (query.azureLogAnalytics?.basicLogsQuery) {
+      onChange(setDashboardTime(query, true));
+      setDisabledTimeOptions([false]);
+    } else {
+      setDisabledTimeOptions([]);
+    }
+  }, [query.azureLogAnalytics?.basicLogsQuery])
   useEffect(() => {
     if (schema && query.azureLogAnalytics?.dashboardTime) {
       const timeColumnOptions: SelectableValue[] = [];
@@ -76,6 +86,8 @@ export function TimeManagement({ query, onQueryChange: onChange, schema }: Azure
     },
     [onChange, query]
   );
+  // console.log(datasource.azureLogAnalyticsDatasource.instanceSettings.jsonData.basicLogsEnabled)
+    console.log(disabledTimeOptions)
   return (
     <>
       <InlineField
@@ -88,13 +100,20 @@ export function TimeManagement({ query, onQueryChange: onChange, schema }: Azure
         }
       >
         <RadioButtonGroup
+          disabled
           options={[
             { label: 'Query', value: false },
             { label: 'Dashboard', value: true },
           ]}
           value={query.azureLogAnalytics?.dashboardTime ?? false}
           size={'md'}
-          onChange={(val) => onChange(setDashboardTime(query, val))}
+          onChange={(val) =>{ 
+            if (!disabledTimeOptions.includes(val)) {
+              onChange(setDashboardTime(query, val))
+            }
+          }}
+          disabledOptions={disabledTimeOptions}
+          
         />
       </InlineField>
       {query.azureLogAnalytics?.dashboardTime && (

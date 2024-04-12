@@ -165,6 +165,11 @@ export const defaultAzureMetricQuery: Partial<AzureMetricQuery> = {
  */
 export interface AzureLogsQuery {
   /**
+   * Whether basic logs query is being run
+   */
+  basicLogsQuery?: boolean;
+  basicLogsQueryCostAcknowledged?: boolean;
+  /**
    * If set to true the dashboard time range will be used as a filter for the query. Otherwise the query time ranges will be used. Defaults to false.
    */
   dashboardTime?: boolean;

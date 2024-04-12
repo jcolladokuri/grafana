@@ -70,6 +70,7 @@ export interface AzureDataSourceJsonData extends DataSourceJsonData {
   tenantId?: string;
   clientId?: string;
   subscriptionId?: string;
+  basicLogsEnabled?: boolean;
 
   // logs
   /** @deprecated Azure Logs credentials */

@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+
 	"net/http"
 	"net/url"
 	"path"
@@ -50,7 +51,11 @@ type AzureLogAnalyticsQuery struct {
 	AppInsightsQuery        bool
 	DashboardTime           bool
 	TimeColumn              string
+	QueryTable              string
+	IsBasicLogsQuery        bool
 }
+
+// response from API call
 
 func (e *AzureLogAnalyticsDatasource) ResourceRequest(rw http.ResponseWriter, req *http.Request, cli *http.Client) (http.ResponseWriter, error) {
 	return e.Proxy.Do(rw, req, cli)
@@ -79,18 +84,33 @@ func (e *AzureLogAnalyticsDatasource) ExecuteTimeSeriesQuery(ctx context.Context
 	return result, nil
 }
 
-func getApiURL(resourceOrWorkspace string, isAppInsightsQuery bool) string {
+func getApiURL(resourceOrWorkspace string, isAppInsightsQuery bool, basicLogsQuery bool) string {
 	matchesResourceURI, _ := regexp.MatchString("^/subscriptions/", resourceOrWorkspace)
-
+	queryOrSearch := ""
+	if basicLogsQuery == true {
+		queryOrSearch = "search"
+	} else {
+		queryOrSearch = "query"
+	}
 	if matchesResourceURI {
 		if isAppInsightsQuery {
 			componentName := resourceOrWorkspace[strings.LastIndex(resourceOrWorkspace, "/")+1:]
 			return fmt.Sprintf("v1/apps/%s/query", componentName)
 		}
-		return fmt.Sprintf("v1%s/query", resourceOrWorkspace)
+		return fmt.Sprintf("v1/%s/%s", resourceOrWorkspace, queryOrSearch)
+
 	} else {
-		return fmt.Sprintf("v1/workspaces/%s/query", resourceOrWorkspace)
+		return fmt.Sprintf("v1/workspaces/%s/%s", resourceOrWorkspace, queryOrSearch)
 	}
+}
+
+func getQueryTable(query string) string {
+	splitQuery := strings.Split(query, "|")
+	return strings.TrimSpace(splitQuery[0])
+}
+
+func getDataVolumeRawQuery(table string) string {
+	return fmt.Sprintf("Usage \n| where DataType == \"%s\"\n| where IsBillable == true\n| summarize BillableDataGB = round(sum(Quantity) / 1000, 3)", table)
 }
 
 func (e *AzureLogAnalyticsDatasource) buildQueries(ctx context.Context, queries []backend.DataQuery, dsInfo types.DatasourceInfo) ([]*AzureLogAnalyticsQuery, error) {
@@ -111,6 +131,7 @@ func (e *AzureLogAnalyticsDatasource) buildQueries(ctx context.Context, queries 
 		traceLogsExploreQuery := ""
 		dashboardTime := false
 		timeColumn := ""
+		isBasicLogsQuery := false
 		if query.QueryType == string(dataquery.AzureQueryTypeAzureLogAnalytics) {
 			queryJSONModel := types.LogJSONQuery{}
 			err := json.Unmarshal(query.JSON, &queryJSONModel)
@@ -144,6 +165,11 @@ func (e *AzureLogAnalyticsDatasource) buildQueries(ctx context.Context, queries 
 
 			if azureLogAnalyticsTarget.Query != nil {
 				queryString = *azureLogAnalyticsTarget.Query
+			}
+
+			if azureLogAnalyticsTarget.BasicLogsQuery != nil {
+				backend.Logger.Warn(fmt.Sprintf("assigning basic logs %v", *azureLogAnalyticsTarget.BasicLogsQuery))
+				isBasicLogsQuery = *azureLogAnalyticsTarget.BasicLogsQuery
 			}
 
 			if azureLogAnalyticsTarget.DashboardTime != nil {
@@ -233,12 +259,14 @@ func (e *AzureLogAnalyticsDatasource) buildQueries(ctx context.Context, queries 
 			timeColumn = "timestamp"
 		}
 
-		apiURL := getApiURL(resourceOrWorkspace, appInsightsQuery)
+		apiURL := getApiURL(resourceOrWorkspace, appInsightsQuery, isBasicLogsQuery)
+		backend.Logger.Warn(fmt.Sprintf("URL: %s", apiURL))
 
 		rawQuery, err := macros.KqlInterpolate(query, dsInfo, queryString, "TimeGenerated")
 		if err != nil {
 			return nil, err
 		}
+		queryTable := getQueryTable(rawQuery)
 
 		azureLogAnalyticsQueries = append(azureLogAnalyticsQueries, &AzureLogAnalyticsQuery{
 			RefID:                   query.RefID,
@@ -255,6 +283,8 @@ func (e *AzureLogAnalyticsDatasource) buildQueries(ctx context.Context, queries 
 			AppInsightsQuery:        appInsightsQuery,
 			DashboardTime:           dashboardTime,
 			TimeColumn:              timeColumn,
+			QueryTable:              queryTable,
+			IsBasicLogsQuery:        isBasicLogsQuery,
 		})
 	}
 
@@ -279,6 +309,53 @@ func (e *AzureLogAnalyticsDatasource) executeQuery(ctx context.Context, query *A
 		}
 	}
 
+	// get the amount of data that is about to be ingested
+	dataIngested := ""
+	if query.IsBasicLogsQuery {
+		dataVolumeRawQuery := getDataVolumeRawQuery(query.QueryTable)
+		dataVolumeQuery := &AzureLogAnalyticsQuery{
+			Query:            dataVolumeRawQuery,
+			DashboardTime:    query.DashboardTime,
+			TimeRange:        query.TimeRange,
+			TimeColumn:       query.TimeColumn,
+			Resources:        query.Resources,
+			QueryType:        query.QueryType,
+			AppInsightsQuery: query.AppInsightsQuery,
+			URL:              getApiURL(query.Resources[0], false, false),
+		}
+		vol_req, vol_err := e.createRequest(ctx, url, dataVolumeQuery)
+		if vol_err != nil {
+			return nil, err
+		}
+		vol_res, err := client.Do(vol_req)
+		if err != nil {
+			return nil, err
+		}
+
+		defer func() {
+			if err := vol_res.Body.Close(); err != nil {
+				backend.Logger.Warn("Failed to close response body for data volume request", "err", err)
+			}
+		}()
+
+		logResponse, err := e.unmarshalResponse(vol_res)
+		if err != nil {
+			return nil, err
+		}
+
+		t, err := logResponse.GetPrimaryResultTable()
+		backend.Logger.Warn(fmt.Sprintf("%v", t))
+		if err != nil {
+			return nil, err
+		}
+
+		num := t.Rows[0][0].(json.Number)
+		if err != nil {
+			return nil, err
+		}
+		dataIngested = fmt.Sprintf("%v", num)
+		// backend.Logger.Warn(math.Round(dataIngested))
+	}
 	req, err := e.createRequest(ctx, url, query)
 	if err != nil {
 		return nil, err
@@ -340,6 +417,9 @@ func (e *AzureLogAnalyticsDatasource) executeQuery(ctx context.Context, query *A
 
 	if query.ResultFormat == dataquery.ResultFormatTable {
 		frame.Meta.PreferredVisualization = data.VisTypeTable
+		frame.Meta.Custom = &LogAnalyticsMeta{
+			BasicLogsDataVolume: dataIngested,
+		}
 	}
 
 	if query.ResultFormat == dataquery.ResultFormatLogs {
@@ -359,6 +439,9 @@ func (e *AzureLogAnalyticsDatasource) executeQuery(ctx context.Context, query *A
 			} else {
 				frame.AppendNotices(data.Notice{Severity: data.NoticeSeverityWarning, Text: "could not convert frame to time series, returning raw table: " + err.Error()})
 			}
+		}
+		frame.Meta.Custom = &LogAnalyticsMeta{
+			BasicLogsDataVolume: dataIngested,
 		}
 	}
 
@@ -476,7 +559,6 @@ func (e *AzureLogAnalyticsDatasource) createRequest(ctx context.Context, queryUR
 	body := map[string]interface{}{
 		"query": query.Query,
 	}
-
 	if query.DashboardTime {
 		from := query.TimeRange.From.Format(time.RFC3339)
 		to := query.TimeRange.To.Format(time.RFC3339)
@@ -485,6 +567,7 @@ func (e *AzureLogAnalyticsDatasource) createRequest(ctx context.Context, queryUR
 		body["query_datetimescope_from"] = from
 		body["query_datetimescope_to"] = to
 		body["query_datetimescope_column"] = query.TimeColumn
+		backend.Logger.Warn(fmt.Sprintf("%s %s", timespan, query.TimeColumn))
 	}
 
 	if len(query.Resources) > 1 && query.QueryType == dataquery.AzureQueryTypeAzureLogAnalytics && !query.AppInsightsQuery {
@@ -505,6 +588,7 @@ func (e *AzureLogAnalyticsDatasource) createRequest(ctx context.Context, queryUR
 	req.URL.Path = "/"
 	req.Header.Set("Content-Type", "application/json")
 	req.URL.Path = path.Join(req.URL.Path, query.URL)
+	backend.Logger.Warn(fmt.Sprintf("%s for url: %s", query.Query, req.URL.Path))
 
 	return req, nil
 }
@@ -735,8 +819,9 @@ func (e *AzureLogAnalyticsDatasource) unmarshalResponse(res *http.Response) (Azu
 
 // LogAnalyticsMeta is a type for the a Frame's Meta's Custom property.
 type LogAnalyticsMeta struct {
-	ColumnTypes     []string `json:"azureColumnTypes"`
-	AzurePortalLink string   `json:"azurePortalLink,omitempty"`
+	ColumnTypes         []string `json:"azureColumnTypes"`
+	AzurePortalLink     string   `json:"azurePortalLink,omitempty"`
+	BasicLogsDataVolume string   `json:"basicLogsDataVolume,omitempty"`
 }
 
 // encodeQuery encodes the query in gzip so the frontend can build links.

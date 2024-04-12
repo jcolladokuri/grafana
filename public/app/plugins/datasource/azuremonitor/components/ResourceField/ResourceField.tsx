@@ -22,13 +22,38 @@ interface ResourceFieldProps<T> extends AzureQueryEditorFieldProps {
   disableRow: (row: ResourceRow, selectedRows: ResourceRowGroup) => boolean;
   renderAdvanced: (resources: T[], onChange: (resources: T[]) => void) => React.ReactNode;
   selectionNotice?: (selectedRows: ResourceRowGroup) => string;
+  setHasBasicLogs: (hasBasicLogs: boolean) => void;
 }
 
 type Props = ResourceFieldProps<string | AzureMonitorResource>;
 
+async function hasBasicLogsTable(resources: Array<string | AzureMonitorResource>, datasource: Datasource) {
+  const resource = resources[0];
+  if (typeof resource === "string" && resource.toLowerCase().indexOf("microsoft.operationalinsights/workspaces") > -1) {
+    const metadata = await datasource.azureLogAnalyticsDatasource.getMetadata(resource.toLowerCase());
+    // console.log(metadata)
+    // for (const table of metadata.tables) {
+    //   const tableMeta = await datasource.azureLogAnalyticsDatasource.getTableMetadata(resource.substring(1), table.name);
+    //   if (tableMeta.properties.plan === "Basic") {
+    //     return true;
+    //   }
+    // }
+    console.log("Metadata", metadata);
+    const tablePromises = metadata.tables.map(async (table) => {
+      const tableMeta = await datasource.azureLogAnalyticsDatasource.getTableMetadata(resource.substring(1), table.name);
+      return tableMeta.properties.plan === "Basic";
+    });
+
+    const results = await Promise.all(tablePromises);
+    return results.some((hasBasicPlan) => hasBasicPlan);
+  }
+  return false;
+  // return true;
+}
 const ResourceField = ({
   query,
   datasource,
+  setHasBasicLogs,
   onQueryChange,
   selectableEntryTypes,
   queryType,
@@ -53,7 +78,11 @@ const ResourceField = ({
   const handleApply = useCallback(
     (resources: Array<string | AzureMonitorResource>) => {
       onQueryChange(setResources(query, queryType, resources));
-      closePicker();
+      hasBasicLogsTable(resources, datasource).then((hasBasicLogsTable) => {
+        console.log("has basic: ", hasBasicLogsTable)
+        setHasBasicLogs(hasBasicLogsTable)
+        closePicker();
+      });
     },
     [closePicker, onQueryChange, query, queryType]
   );

@@ -126,6 +126,7 @@ const EditorForQueryType = ({
   setError,
   range,
 }: EditorForQueryTypeProps) => {
+  console.log("query in query editor: ", query)
   switch (query.queryType) {
     case AzureQueryType.AzureMonitor:
       return (

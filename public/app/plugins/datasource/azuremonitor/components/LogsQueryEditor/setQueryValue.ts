@@ -30,6 +30,27 @@ export function setDashboardTime(query: AzureMonitorQuery, dashboardTime: boolea
   };
 }
 
+export function setLogsQueryType(query: AzureMonitorQuery, basicLogsQuery: boolean): AzureMonitorQuery {
+  return {
+    ...query,
+    azureLogAnalytics: {
+      ...query.azureLogAnalytics,
+      basicLogsQuery,
+      basicLogsQueryCostAcknowledged: false
+    }
+  }
+}
+
+export function setLogsQueryAcknowledgement(query: AzureMonitorQuery, basicLogsQueryCostAcknowledged: boolean): AzureMonitorQuery {
+  return {
+    ...query,
+    azureLogAnalytics: {
+      ...query.azureLogAnalytics,
+      basicLogsQueryCostAcknowledged
+    }
+  }
+}
+
 export function setTimeColumn(query: AzureMonitorQuery, timeColumn: string): AzureMonitorQuery {
   return {
     ...query,
