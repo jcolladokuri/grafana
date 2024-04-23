@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 
 import { PanelData, TimeRange } from '@grafana/data';
 import { EditorFieldGroup, EditorRow, EditorRows } from '@grafana/experimental';
-import { Alert, LinkButton } from '@grafana/ui';
+import { getTemplateSrv } from '@grafana/runtime';
+import { Alert, LinkButton, Text } from '@grafana/ui';
 
 import Datasource from '../../datasource';
 import { selectors } from '../../e2e/selectors';
@@ -18,6 +19,7 @@ import QueryField from './QueryField';
 import { TimeManagement } from './TimeManagement';
 import { setBasicLogsQuery, setFormatAs, setKustoQuery } from './setQueryValue';
 import useMigrations from './useMigrations';
+import { calculateTimeRange } from './utils';
 
 interface LogsQueryEditorProps {
   query: AzureMonitorQuery;
@@ -46,6 +48,10 @@ const LogsQueryEditor = ({
 }: LogsQueryEditorProps) => {
   const migrationError = useMigrations(datasource, query, onChange);
   const [showBasicLogsToggle, setShowBasicLogsToggle] = useState<boolean>(false);
+  const [showDataRetentionWarning, setShowDataRetentionWarning] = useState<boolean>(false);
+  const templateSrv = getTemplateSrv();
+  const from = templateSrv.replace('$__from');
+  const to = templateSrv.replace('$__to');
 
   const disableRow = (row: ResourceRow, selectedRows: ResourceRowGroup) => {
     if (selectedRows.length === 0) {
@@ -87,6 +93,15 @@ const LogsQueryEditor = ({
       onChange(setKustoQuery(updatedBasicLogsQuery, ''));
     }
   }, [basicLogsEnabled, onChange, query, showBasicLogsToggle]);
+
+  useEffect(() => {
+    const timeRange = calculateTimeRange(parseInt(from, 10), parseInt(to, 10));
+    if (showBasicLogsToggle && query.azureLogAnalytics?.basicLogsQuery && timeRange > 8) {
+      setShowDataRetentionWarning(true);
+    } else {
+      setShowDataRetentionWarning(false);
+    }
+  }, [query.azureLogAnalytics?.basicLogsQuery, showBasicLogsToggle, from, to]);
   let portalLinkButton = null;
 
   if (data?.series) {
@@ -192,6 +207,13 @@ const LogsQueryEditor = ({
           </EditorFieldGroup>
         </EditorRow>
       </EditorRows>
+      {showDataRetentionWarning && (
+        <Alert severity="warning" title="Basic Logs data retention">
+          <Text>
+            Data retention for Basic Logs is fixed at eight days. You will only see data within this timeframe.
+          </Text>
+        </Alert>
+      )}
     </span>
   );
 };
