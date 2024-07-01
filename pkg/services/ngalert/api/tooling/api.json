@@ -1,5 +1,5 @@
 {
- "basePath": "/api",
+ "basePath": "/api/v2/",
  "consumes": [
   "application/json"
  ],
@@ -967,7 +967,9 @@
    },
    "type": "object"
   },
-  "EvalQueriesResponse": {},
+  "EvalQueriesResponse": {
+   "type": "object"
+  },
   "ExplorePanelsState": {
    "description": "This is an object constructed with the keys as the values of the enum VisType and the value being a bag of properties"
   },
@@ -2467,6 +2469,16 @@
   "PermissionDenied": {
    "type": "object"
   },
+  "PostSilencesOKBody": {
+   "description": "PostSilencesOKBody post silences o k body",
+   "properties": {
+    "silenceID": {
+     "description": "silence ID",
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
   "PostableApiAlertingConfig": {
    "description": "nolint:revive",
    "properties": {
@@ -3655,6 +3667,20 @@
    },
    "type": "object"
   },
+  "SilenceMetadata": {
+   "properties": {
+    "folder_uid": {
+     "type": "string"
+    },
+    "rule_title": {
+     "type": "string"
+    },
+    "rule_uid": {
+     "type": "string"
+    }
+   },
+   "type": "object"
+  },
   "SlackAction": {
    "description": "See https://api.slack.com/docs/message-attachments#action_fields and https://api.slack.com/docs/message-buttons\nfor more information.",
    "properties": {
@@ -4459,9 +4485,9 @@
    "type": "object"
   },
   "alertGroups": {
-   "description": "AlertGroups alert groups",
    "items": {
-    "$ref": "#/definitions/alertGroup"
+    "$ref": "#/definitions/alertGroup",
+    "type": "object"
    },
    "type": "array"
   },
@@ -4564,6 +4590,7 @@
    "type": "object"
   },
   "gettableAlert": {
+   "description": "GettableAlert gettable alert",
    "properties": {
     "annotations": {
      "$ref": "#/definitions/labelSet"
@@ -4619,14 +4646,25 @@
    "type": "object"
   },
   "gettableAlerts": {
-   "description": "GettableAlerts gettable alerts",
    "items": {
-    "$ref": "#/definitions/gettableAlert"
+    "$ref": "#/definitions/gettableAlert",
+    "type": "object"
    },
    "type": "array"
   },
-  "gettableSilence": {
+  "gettableGrafanaSilence": {
    "properties": {
+    "accessControl": {
+     "additionalProperties": {
+      "type": "boolean"
+     },
+     "example": {
+      "create": false,
+      "read": true,
+      "write": false
+     },
+     "type": "object"
+    },
     "comment": {
      "description": "comment",
      "type": "string"
@@ -4646,6 +4684,9 @@
     },
     "matchers": {
      "$ref": "#/definitions/matchers"
+    },
+    "metadata": {
+     "$ref": "#/definitions/SilenceMetadata"
     },
     "startsAt": {
      "description": "starts at",
@@ -4673,14 +4714,35 @@
    ],
    "type": "object"
   },
+  "gettableGrafanaSilences": {
+   "items": {
+    "$ref": "#/definitions/gettableGrafanaSilence"
+   },
+   "type": "array"
+  },
+  "gettableSilence": {
+   "required": [
+    "comment",
+    "createdBy",
+    "endsAt",
+    "matchers",
+    "startsAt",
+    "id",
+    "status",
+    "updatedAt"
+   ],
+   "type": "object"
+  },
   "gettableSilences": {
    "description": "GettableSilences gettable silences",
    "items": {
-    "$ref": "#/definitions/gettableSilence"
+    "$ref": "#/definitions/gettableSilence",
+    "type": "object"
    },
    "type": "array"
   },
   "integration": {
+   "description": "Integration integration",
    "properties": {
     "lastNotifyAttempt": {
      "description": "A timestamp indicating the last attempt to deliver a notification regardless of the outcome.\nFormat: date-time",
@@ -4824,6 +4886,7 @@
    "type": "array"
   },
   "postableSilence": {
+   "description": "PostableSilence postable silence",
    "properties": {
     "comment": {
      "description": "comment",
@@ -4861,24 +4924,6 @@
    "type": "object"
   },
   "receiver": {
-   "description": "Receiver receiver",
-   "properties": {
-    "active": {
-     "description": "active",
-     "type": "boolean"
-    },
-    "integrations": {
-     "description": "integrations",
-     "items": {
-      "$ref": "#/definitions/integration"
-     },
-     "type": "array"
-    },
-    "name": {
-     "description": "name",
-     "type": "string"
-    }
-   },
    "required": [
     "active",
     "integrations",
@@ -4975,10 +5020,15 @@
    "type": "object"
   }
  },
+ "host": "localhost",
  "info": {
-  "description": "Package definitions includes the types required for generating or consuming an OpenAPI\nspec for the Grafana Alerting API.",
-  "title": "Grafana Alerting API.",
-  "version": "1.1.0"
+  "description": "API of the Prometheus Alertmanager (https://github.com/prometheus/alertmanager)\nSchemes:\nhttp",
+  "license": {
+   "name": "Apache 2.0",
+   "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+  },
+  "title": "Alertmanager API",
+  "version": "0.0.1"
  },
  "paths": {
   "/v1/provisioning/alert-rules": {
@@ -6181,6 +6231,204 @@
      "$ref": "#/definitions/postableAlert"
     },
     "type": "array"
+   }
+  },
+  "deleteSilenceInternalServerError": {
+   "description": "DeleteSilenceInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "deleteSilenceNotFound": {
+   "description": "DeleteSilenceNotFound A silence with the specified ID was not found"
+  },
+  "deleteSilenceOK": {
+   "description": "DeleteSilenceOK Delete silence response"
+  },
+  "getAlertGroupsBadRequest": {
+   "description": "GetAlertGroupsBadRequest Bad request",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getAlertGroupsInternalServerError": {
+   "description": "GetAlertGroupsInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getAlertGroupsOK": {
+   "description": "GetAlertGroupsOK Get alert groups response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/alertGroups"
+   }
+  },
+  "getAlertsBadRequest": {
+   "description": "GetAlertsBadRequest Bad request",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getAlertsInternalServerError": {
+   "description": "GetAlertsInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getAlertsOK": {
+   "description": "GetAlertsOK Get alerts response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/gettableAlerts"
+   }
+  },
+  "getReceiversOK": {
+   "description": "GetReceiversOK Get receivers response",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "items": {
+      "$ref": "#/definitions/receiver"
+     },
+     "type": "array"
+    }
+   }
+  },
+  "getSilenceInternalServerError": {
+   "description": "GetSilenceInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getSilenceNotFound": {
+   "description": "GetSilenceNotFound A silence with the specified ID was not found"
+  },
+  "getSilenceOK": {
+   "description": "GetSilenceOK Get silence response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/gettableSilence"
+   }
+  },
+  "getSilencesBadRequest": {
+   "description": "GetSilencesBadRequest Bad request",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getSilencesInternalServerError": {
+   "description": "GetSilencesInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "getSilencesOK": {
+   "description": "GetSilencesOK Get silences response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/gettableSilences"
+   }
+  },
+  "getStatusOK": {
+   "description": "GetStatusOK Get status response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/alertmanagerStatus"
+   }
+  },
+  "postAlertsBadRequest": {
+   "description": "PostAlertsBadRequest Bad request",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "postAlertsInternalServerError": {
+   "description": "PostAlertsInternalServerError Internal server error",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "postAlertsOK": {
+   "description": "PostAlertsOK Create alerts response"
+  },
+  "postSilencesBadRequest": {
+   "description": "PostSilencesBadRequest Bad request",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "postSilencesNotFound": {
+   "description": "PostSilencesNotFound A silence with the specified ID was not found",
+   "headers": {
+    "body": {
+     "description": "In: Body",
+     "type": "string"
+    }
+   }
+  },
+  "postSilencesOK": {
+   "description": "PostSilencesOK Create / update silence response",
+   "headers": {
+    "body": {
+     "description": "In: Body"
+    }
+   },
+   "schema": {
+    "$ref": "#/definitions/PostSilencesOKBody"
    }
   },
   "receiversResponse": {
