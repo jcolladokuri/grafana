@@ -1906,7 +1906,7 @@
      "type": "array"
     }
    },
-   "title": "Headers represents the configuration for HTTP headers.",
+   "title": "Header represents the configuration for a single HTTP header.",
    "type": "object"
   },
   "Headers": {
@@ -3403,6 +3403,12 @@
   "Route": {
    "description": "A Route is a node that contains definitions of how to handle alerts. This is modified\nfrom the upstream alertmanager in that it adds the ObjectMatchers property.",
    "properties": {
+    "active_time_intervals": {
+     "items": {
+      "type": "string"
+     },
+     "type": "array"
+    },
     "continue": {
      "type": "boolean"
     },
@@ -4575,7 +4581,6 @@
    "type": "object"
   },
   "alertGroups": {
-   "description": "AlertGroups alert groups",
    "items": {
     "$ref": "#/definitions/alertGroup",
     "type": "object"
@@ -4737,7 +4742,6 @@
    "type": "object"
   },
   "gettableAlerts": {
-   "description": "GettableAlerts gettable alerts",
    "items": {
     "$ref": "#/definitions/gettableAlert",
     "type": "object"
